@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Пасьянс Коллекция</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #ffffff;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .hud-box {
+            background: rgba(15, 23, 42, 0.85);
+            padding: 6px 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            font-size: 0.85rem;
+            font-weight: bold;
+            pointer-events: auto;
+            display: flex;
+            gap: 8px;
+        }
+
+        .hud-btn {
+            background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+            border: none;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .hud-btn:active { transform: scale(0.95); }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin: 0 0 10px 0;
+            color: #38bdf8;
+            text-shadow: 0 4px 20px rgba(56, 189, 248, 0.4);
+        }
+
+        .section-label {
+            margin: 8px 0 4px 0;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .options-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .opt-btn {
+            padding: 8px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .opt-btn.active {
+            background: #38bdf8;
+            color: #0f172a;
+            border-color: #38bdf8;
+        }
+
+        .start-btn {
+            width: 200px;
+            padding: 12px 0;
+            margin-top: 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #ffffff;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            background: linear-gradient(45deg, #22c55e, #16a34a);
+        }
+
+        .backs-grid {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .back-card {
+            width: 44px;
+            height: 62px;
+            border-radius: 6px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+        }
+
+        .back-card.selected {
+            border-color: #38bdf8;
+            transform: scale(1.08);
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-container">
+        <div class="hud-box">
+            <span>⏱️ <span id="timer" style="color:#38bdf8">00:00</span></span>
+            <span>🏆 <span id="moves" style="color:#facc15">0</span></span>
+        </div>
+        <div class="hud-box">
+            <button class="hud-btn" id="hudCamBtn" onclick="toggleCameraView()">🎥 Вид: 3D</button>
+            <button class="hud-btn" onclick="openMenu()">⚙️ Меню</button>
+        </div>
+    </div>
+
+    <!-- Главное Меню -->
+    <div id="menuOverlay" class="overlay">
+        <h1>3D ПАСЬЯНС</h1>
+
+        <div class="section-label">Вид Пасьянса</div>
+        <div class="options-row">
+            <button class="opt-btn active" id="game-klondike" onclick="setGameType('klondike')">♠️ Косынка</button>
+        </div>
+
+        <div id="drawCountSection">
+            <div class="section-label">Карты в сдаче</div>
+            <div class="options-row">
+                <button class="opt-btn active" id="draw-1" onclick="setDrawCount(1)">🎴 По 1 карте</button>
+                <button class="opt-btn" id="draw-3" onclick="setDrawCount(3)">🎴🎴🎴 По 3 карты</button>
+            </div>
+        </div>
+
+        <div class="section-label">Режим Камеры</div>
+        <div class="options-row">
+            <button class="opt-btn active" id="cam-3d" onclick="setCameraMode('3d')">🎥 3D Вид</button>
+            <button class="opt-btn" id="cam-2d" onclick="setCameraMode('2d')">🗺️ 2D Сверху</button>
+        </div>
+
+        <div class="section-label">Рубашка Карты</div>
+        <div class="backs-grid">
+            <div class="back-card selected" id="back-blue" style="background: radial-gradient(circle, #1e40af, #1e1b4b);" onclick="setCardBack('blue')"></div>
+            <div class="back-card" id="back-red" style="background: radial-gradient(circle, #b91c1c, #450a0a);" onclick="setCardBack('red')"></div>
+            <div class="back-card" id="back-neon" style="background: radial-gradient(circle, #047857, #022c22);" onclick="setCardBack('neon')"></div>
+            <div class="back-card" id="back-gold" style="background: radial-gradient(circle, #d97706, #451a03);" onclick="setCardBack('gold')"></div>
+            <div class="back-card" id="back-space" style="background: radial-gradient(circle, #6d28d9, #2e1065);" onclick="setCardBack('space')"></div>
+        </div>
+
+        <button class="start-btn" onclick="startNewGame()">▶ Сыграть новую игру</button>
+    </div>
+
+    <!-- Экран Победы -->
+    <div id="winOverlay" class="overlay hidden">
+        <h1 style="color: #22c55e;">🎉 ПОБЕДА!</h1>
+        <p style="font-size: 1.1rem; margin-bottom: 20px;">Вы успешно собрали пасьянс!</p>
+        <button class="start-btn" onclick="openMenu()">В меню</button>
+    </div>
+
+    <script>
+        const SUITS = ['♠', '♥', '♦', '♣'];
+        const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        const CARD_WIDTH = 1.8;
+        const CARD_HEIGHT = 2.6;
+
+        let scene, camera, renderer, raycaster, mouse;
+        let dragPlane;
+        let selectedGameType = 'klondike';
+        let drawCount = 1;
+        let selectedCardBack = 'blue';
+        let is3DMode = true;
+
+        let movesCount = 0;
+        let timerInterval = null;
+        let secondsPassed = 0;
+
+        let deck = [];
+        let waste = [];
+        let foundations = [[], [], [], []];
+        let tableau = [[], [], [], [], [], [], []];
+        let cardMeshes = [];
+        let slotMeshes = [];
+
+        let draggedCards = [];
+        let isDragging = false;
+        let pointerStart = { x: 0, y: 0 };
+        let lastTapTime = 0;
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            applyCameraPosition();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            const planeGeo = new THREE.PlaneGeometry(100, 100);
+            const planeMat = new THREE.MeshBasicMaterial({ visible: false });
+            dragPlane = new THREE.Mesh(planeGeo, planeMat);
+            dragPlane.rotation.x = -Math.PI / 2;
+            scene.add(dragPlane);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(0, 20, 10);
+            scene.add(dirLight);
+
+            const tableGeo = new THREE.BoxGeometry(18, 0.4, 12);
+            const tableMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.5 });
+            const table = new THREE.Mesh(tableGeo, tableMat);
+            table.position.y = -0.21;
+            scene.add(table);
+
+            createSlotsUI();
+
+            window.addEventListener('resize', onWindowResize);
+
+            const dom = renderer.domElement;
+
+            // Надежная обработка touch-событий с support для мобильных браузеров
+            dom.addEventListener('touchstart', (e) => {
+                if (e.touches.length > 0) {
+                    processPointerStart(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: true });
+
+            dom.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    processPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: true });
+
+            dom.addEventListener('touchend', (e) => {
+                const touch = e.changedTouches[0] || (e.touches.length > 0 ? e.touches[0] : null);
+                if (touch) {
+                    processPointerEnd(touch.clientX, touch.clientY);
+                } else {
+                    processPointerEnd(pointerStart.x, pointerStart.y);
+                }
+            }, { passive: true });
+
+            // Мышь для ПК
+            dom.addEventListener('mousedown', (e) => processPointerStart(e.clientX, e.clientY));
+            dom.addEventListener('mousemove', (e) => processPointerMove(e.clientX, e.clientY));
+            dom.addEventListener('mouseup', (e) => processPointerEnd(e.clientX, e.clientY));
+
+            animate();
+        }
+
+        function applyCameraPosition() {
+            const isMobile = window.innerWidth < window.innerHeight;
+            const dist = isMobile ? 22 : 16;
+
+            if (is3DMode) {
+                camera.position.set(0, dist, dist * 0.5);
+                camera.lookAt(0, 0, 0);
+            } else {
+                camera.position.set(0, dist + 2, 0.01);
+                camera.lookAt(0, 0, 0);
+            }
+        }
+
+        function toggleCameraView() {
+            is3DMode = !is3DMode;
+            applyCameraPosition();
+            updateCameraUI();
+        }
+
+        function setCameraMode(mode) {
+            is3DMode = (mode === '3d');
+            applyCameraPosition();
+            updateCameraUI();
+        }
+
+        function updateCameraUI() {
+            const btn = document.getElementById('hudCamBtn');
+            btn.textContent = is3DMode ? "🎥 Вид: 3D" : "🗺️ Вид: 2D";
+            document.getElementById('cam-3d').classList.toggle('active', is3DMode);
+            document.getElementById('cam-2d').classList.toggle('active', !is3DMode);
+        }
+
+        function createSlotsUI() {
+            const slotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 });
+            const slotGeo = new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT);
+
+            createSlotMesh(-6.5, -4.0, slotMat, slotGeo, 'stock');
+            
+            for (let i = 0; i < 4; i++) {
+                createSlotMesh(1.5 + i * 2.2, -4.0, slotMat, slotGeo, `foundation-${i}`);
+            }
+
+            for (let i = 0; i < 7; i++) {
+                createSlotMesh(-6.5 + i * 2.2, -1.0, slotMat, slotGeo, `tableau-${i}`);
+            }
+        }
+
+        function createSlotMesh(x, z, mat, geo, type) {
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.set(x, 0.01, z);
+            mesh.userData = { type: type };
+            scene.add(mesh);
+            slotMeshes.push(mesh);
+        }
+
+        function createCardTexture(suit, value, isBack) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 736;
+            const ctx = canvas.getContext('2d');
+
+            if (isBack) {
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, 512, 736);
+                
+                let mainColor = "#1e3a8a", accentColor = "#3b82f6", strokeColor = "#fbbf24";
+
+                if (selectedCardBack === 'red') { mainColor = "#7f1d1d"; accentColor = "#dc2626"; strokeColor = "#fef08a"; }
+                else if (selectedCardBack === 'neon') { mainColor = "#064e3b"; accentColor = "#10b981"; strokeColor = "#a7f3d0"; }
+                else if (selectedCardBack === 'gold') { mainColor = "#78350f"; accentColor = "#f59e0b"; strokeColor = "#fef08a"; }
+                else if (selectedCardBack === 'space') { mainColor = "#3b0764"; accentColor = "#8b5cf6"; strokeColor = "#c084fc"; }
+
+                ctx.fillStyle = mainColor;
+                ctx.fillRect(16, 16, 480, 704);
+
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 6;
+                ctx.strokeRect(28, 28, 456, 680);
+                ctx.strokeRect(36, 36, 440, 664);
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(40, 40, 432, 656);
+                ctx.clip();
+
+                ctx.strokeStyle = accentColor;
+                ctx.lineWidth = 3;
+
+                const step = 32;
+                for (let x = -736; x < 512 + 736; x += step) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 736, 736); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x - 736, 736); ctx.stroke();
+                }
+
+                ctx.fillStyle = mainColor;
+                ctx.beginPath();
+                ctx.ellipse(256, 368, 110, 150, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 8;
+                ctx.stroke();
+
+                ctx.fillStyle = accentColor;
+                ctx.font = "bold 90px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("♠♥♦♣", 256, 368);
+
+                ctx.restore();
+
+            } else {
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, 512, 736);
+                ctx.strokeStyle = "#cccccc";
+                ctx.lineWidth = 12;
+                ctx.strokeRect(12, 12, 488, 712);
+
+                const isRed = (suit === '♥' || suit === '♦');
+                const color = isRed ? '#e11d48' : '#0f172a';
+                ctx.fillStyle = color;
+                
+                ctx.font = "bold 90px sans-serif";
+                ctx.textAlign = "left";
+                ctx.fillText(value, 35, 100);
+                ctx.font = "bold 80px sans-serif";
+                ctx.fillText(suit, 40, 185);
+
+                ctx.save();
+                ctx.translate(512, 736);
+                ctx.rotate(Math.PI);
+                ctx.font = "bold 90px sans-serif";
+                ctx.fillText(value, 35, 100);
+                ctx.font = "bold 80px sans-serif";
+                ctx.fillText(suit, 40, 185);
+                ctx.restore();
+
+                ctx.font = "bold 180px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText(suit, 256, 430);
+            }
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createCardMesh(cardData) {
+            const cardGroup = new THREE.Group();
+            const geo = new THREE.PlaneGeometry(CARD_WIDTH, CARD_HEIGHT);
+            
+            const frontTex = createCardTexture(cardData.suit, cardData.value, false);
+            const frontMat = new THREE.MeshBasicMaterial({ map: frontTex, side: THREE.FrontSide });
+            const frontMesh = new THREE.Mesh(geo, frontMat);
+            frontMesh.position.z = 0.005;
+
+            const backTex = createCardTexture(cardData.suit, cardData.value, true);
+            const backMat = new THREE.MeshBasicMaterial({ map: backTex, side: THREE.FrontSide });
+            const backMesh = new THREE.Mesh(geo, backMat);
+            backMesh.rotation.y = Math.PI;
+            backMesh.position.z = -0.005;
+
+            cardGroup.add(frontMesh);
+            cardGroup.add(backMesh);
+            cardGroup.rotation.x = -Math.PI / 2;
+
+            cardData.color = (cardData.suit === '♥' || cardData.suit === '♦') ? 'red' : 'black';
+            cardGroup.userData = cardData;
+            cardData.mesh = cardGroup;
+            scene.add(cardGroup);
+            cardMeshes.push(cardGroup);
+            return cardGroup;
+        }
+
+        function startNewGame() {
+            document.getElementById('menuOverlay').classList.add('hidden');
+            movesCount = 0;
+            secondsPassed = 0;
+            document.getElementById('moves').textContent = movesCount;
+
+            cardMeshes.forEach(m => scene.remove(m));
+            cardMeshes = [];
+            deck = [];
+            waste = [];
+            foundations = [[], [], [], []];
+            tableau = [[], [], [], [], [], [], []];
+
+            let cards = [];
+            SUITS.forEach(suit => {
+                VALUES.forEach((val, idx) => {
+                    cards.push({ suit: suit, value: val, rank: idx + 1, faceUp: false });
+                });
+            });
+            cards.sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j <= i; j++) {
+                    let card = cards.pop();
+                    if (j === i) card.faceUp = true;
+                    tableau[i].push(card);
+                    createCardMesh(card);
+                }
+            }
+
+            while (cards.length > 0) {
+                let card = cards.pop();
+                deck.push(card);
+                createCardMesh(card);
+            }
+
+            updateBoardPositions();
+
+            if(timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                secondsPassed++;
+                const mins = String(Math.floor(secondsPassed / 60)).padStart(2, '0');
+                const secs = String(secondsPassed % 60).padStart(2, '0');
+                document.getElementById('timer').textContent = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function updateBoardPositions() {
+            deck.forEach((card, idx) => {
+                card.faceUp = false;
+                card.mesh.position.set(-6.5, 0.02 * idx + 0.02, -4.0);
+                card.mesh.rotation.set(-Math.PI / 2, Math.PI, Math.PI);
+            });
+
+            waste.forEach((card, idx) => {
+                card.faceUp = true;
+                card.mesh.position.set(-4.3 + Math.min(idx, 3) * 0.3, 0.02 * idx + 0.02, -4.0);
+                card.mesh.rotation.set(-Math.PI / 2, 0, Math.PI);
+            });
+
+            foundations.forEach((stack, fIdx) => {
+                stack.forEach((card, idx) => {
+                    card.mesh.position.set(1.5 + fIdx * 2.2, 0.02 * idx + 0.02, -4.0);
+                    card.mesh.rotation.set(-Math.PI / 2, 0, Math.PI);
+                });
+            });
+
+            tableau.forEach((stack, tIdx) => {
+                stack.forEach((card, idx) => {
+                    const x = -6.5 + tIdx * 2.2;
+                    const z = -1.0 + idx * 0.45;
+                    card.mesh.position.set(x, 0.02 * idx + 0.02, z);
+                    card.mesh.rotation.set(-Math.PI / 2, card.faceUp ? 0 : Math.PI, Math.PI);
+                });
+            });
+        }
+
+        function updateMouseCoordinates(clientX, clientY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        }
+
+        function processPointerStart(clientX, clientY) {
+            pointerStart.x = clientX;
+            pointerStart.y = clientY;
+            updateMouseCoordinates(clientX, clientY);
+
+            raycaster.setFromCamera(mouse, camera);
+
+            let targets = [];
+            cardMeshes.forEach(g => g.children.forEach(c => targets.push(c)));
+            targets = targets.concat(slotMeshes);
+
+            const intersects = raycaster.intersectObjects(targets);
+
+            if (intersects.length > 0) {
+                let clickedObj = intersects[0].object;
+                if (clickedObj.parent && clickedObj.parent.userData.suit) {
+                    clickedObj = clickedObj.parent;
+                }
+
+                if (clickedObj.userData.type === 'stock' || (deck.length > 0 && clickedObj === deck[deck.length - 1].mesh)) {
+                    drawFromDeck();
+                    return;
+                } else if (deck.length === 0 && clickedObj.userData.type === 'stock') {
+                    recycleWaste();
+                    return;
+                }
+
+                const card = clickedObj.userData;
+                if (card && card.faceUp) {
+                    startDrag(card);
+                }
+            }
+        }
+
+        function processPointerMove(clientX, clientY) {
+            if (!isDragging || draggedCards.length === 0) return;
+
+            updateMouseCoordinates(clientX, clientY);
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(dragPlane);
+
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                const baseCard = draggedCards[0];
+                baseCard.mesh.position.x = point.x;
+                baseCard.mesh.position.z = point.z;
+
+                for (let i = 1; i < draggedCards.length; i++) {
+                    draggedCards[i].mesh.position.x = point.x;
+                    draggedCards[i].mesh.position.z = point.z + i * 0.45;
+                }
+            }
+        }
+
+        function processPointerEnd(clientX, clientY) {
+            if (!isDragging) {
+                const dist = Math.hypot(clientX - pointerStart.x, clientY - pointerStart.y);
+                if (dist < 15 && draggedCards.length === 1) {
+                    // Двойной тап или быстрый клик для автоматического перемещения карты на базу
+                    const currentTime = new Date().getTime();
+                    if (currentTime - lastTapTime < 300) {
+                        tryAutoMove(draggedCards[0]);
+                    }
+                    lastTapTime = currentTime;
+                }
+                draggedCards = [];
+                return;
+            }
+
+            isDragging = false;
+            const baseCard = draggedCards[0];
+            let moveSuccess = false;
+
+            updateMouseCoordinates(clientX, clientY);
+            raycaster.setFromCamera(mouse, camera);
+            
+            let targets = slotMeshes.slice();
+            cardMeshes.forEach(g => {
+                if (!draggedCards.some(dc => dc.mesh === g)) {
+                    g.children.forEach(c => targets.push(c));
+                }
+            });
+
+            const intersects = raycaster.intersectObjects(targets);
+
+            if (intersects.length > 0) {
+                let targetObj = intersects[0].object;
+                if (targetObj.parent && targetObj.parent.userData.suit) targetObj = targetObj.parent;
+
+                for (let tIdx = 0; tIdx < 7; tIdx++) {
+                    const stack = tableau[tIdx];
+                    const slot = slotMeshes.find(s => s.userData.type === `tableau-${tIdx}`);
+
+                    if (targetObj === slot || (stack.length > 0 && targetObj === stack[stack.length - 1].mesh)) {
+                        const topCard = stack[stack.length - 1];
+
+                        if ((!topCard && baseCard.rank === 13) || (topCard && topCard.faceUp && topCard.color !== baseCard.color && topCard.rank === baseCard.rank + 1)) {
+                            removeDraggedFromSource();
+                            draggedCards.forEach(c => stack.push(c));
+                            moveSuccess = true;
+                            movesCount++;
+                            document.getElementById('moves').textContent = movesCount;
+                            break;
+                        }
+                    }
+                }
+
+                if (!moveSuccess && draggedCards.length === 1) {
+                    for (let fIdx = 0; fIdx < 4; fIdx++) {
+                        const stack = foundations[fIdx];
+                        const slot = slotMeshes.find(s => s.userData.type === `foundation-${fIdx}`);
+
+                        if (targetObj === slot || (stack.length > 0 && targetObj === stack[stack.length - 1].mesh)) {
+                            const topCard = stack[stack.length - 1];
+                            if ((!topCard && baseCard.rank === 1) || (topCard && topCard.suit === baseCard.suit && baseCard.rank === topCard.rank + 1)) {
+                                removeDraggedFromSource();
+                                foundations[fIdx].push(baseCard);
+                                moveSuccess = true;
+                                movesCount++;
+                                document.getElementById('moves').textContent = movesCount;
+                                checkWin();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            updateBoardPositions();
+            draggedCards = [];
+        }
+
+        function startDrag(card) {
+            draggedCards = [];
+
+            if (waste.length > 0 && waste[waste.length - 1] === card) {
+                draggedCards.push(card);
+            } else {
+                tableau.forEach(stack => {
+                    const idx = stack.indexOf(card);
+                    if (idx !== -1) {
+                        for (let i = idx; i < stack.length; i++) {
+                            draggedCards.push(stack[i]);
+                        }
+                    }
+                });
+            }
+
+            if (draggedCards.length > 0) {
+                isDragging = true;
+                draggedCards.forEach((c, i) => {
+                    c.mesh.position.y += 0.5 + i * 0.01;
+                });
+            }
+        }
+
+        function removeDraggedFromSource() {
+            const first = draggedCards[0];
+            const wIdx = waste.indexOf(first);
+            if (wIdx !== -1) { waste.splice(wIdx, 1); return; }
+
+            tableau.forEach(stack => {
+                const idx = stack.indexOf(first);
+                if (idx !== -1) {
+                    stack.splice(idx, draggedCards.length);
+                    if (stack.length > 0) stack[stack.length - 1].faceUp = true;
+                }
+            });
+        }
+
+        function drawFromDeck() {
+            if (deck.length === 0) {
+                recycleWaste();
+                return;
+            }
+            const count = Math.min(drawCount, deck.length);
+            for (let i = 0; i < count; i++) {
+                let card = deck.pop();
+                card.faceUp = true;
+                waste.push(card);
+            }
+            movesCount++;
+            document.getElementById('moves').textContent = movesCount;
+            updateBoardPositions();
+        }
+
+        function recycleWaste() {
+            if (waste.length === 0) return;
+            while (waste.length > 0) {
+                let card = waste.pop();
+                card.faceUp = false;
+                deck.push(card);
+            }
+            movesCount++;
+            document.getElementById('moves').textContent = movesCount;
+            updateBoardPositions();
+        }
+
+        function tryAutoMove(card) {
+            if (!card.faceUp) return;
+
+            for (let i = 0; i < 4; i++) {
+                const stack = foundations[i];
+                const topCard = stack[stack.length - 1];
+
+                if ((!topCard && card.rank === 1) || (topCard && topCard.suit === card.suit && card.rank === topCard.rank + 1)) {
+                    draggedCards = [card];
+                    removeDraggedFromSource();
+                    foundations[i].push(card);
+                    movesCount++;
+                    document.getElementById('moves').textContent = movesCount;
+                    updateBoardPositions();
+                    checkWin();
+                    return;
+                }
+            }
+        }
+
+        function checkWin() {
+            let totalInFoundations = foundations.reduce((acc, stack) => acc + stack.length, 0);
+            if (totalInFoundations === 52) {
+                if(timerInterval) clearInterval(timerInterval);
+                document.getElementById('winOverlay').classList.remove('hidden');
+            }
+        }
+
+        function setGameType(type) { selectedGameType = type; }
+        function setDrawCount(count) {
+            drawCount = count;
+            document.getElementById('draw-1').classList.toggle('active', count === 1);
+            document.getElementById('draw-3').classList.toggle('active', count === 3);
+        }
+        function setCardBack(back) {
+            selectedCardBack = back;
+            document.querySelectorAll('.back-card').forEach(b => b.classList.remove('selected'));
+            document.getElementById(`back-${back}`).classList.add('selected');
+        }
+
+        function openMenu() {
+            document.getElementById('menuOverlay').classList.remove('hidden');
+            document.getElementById('winOverlay').classList.add('hidden');
+            if(timerInterval) clearInterval(timerInterval);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            applyCameraPosition();
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init3D();
+    </script>
+</body>
+</html>
